@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>灵感库</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">灵感库 <span id="libraryStats" class="muted"></span></div>
+    <div class="top-actions">
+      <button id="openGroups" class="secondary">灵感组合</button>
+      <button id="openImports" class="secondary">导入与记录</button>
+      <button id="openMaintenance" class="secondary">维护</button>
+    </div>
+  </header>
+  <main class="layout">
+    <aside class="sidebar">
+      <div class="side-heading">标签</div>
+      <input id="tagFilter" type="search" placeholder="筛选标签" autocomplete="off">
+      <div class="tag-rule">点击 + 包含，点击 − 排除</div>
+      <div id="tagList" class="tag-list"></div>
+    </aside>
+    <section class="content">
+      <form id="searchForm" class="search-panel">
+        <div class="search-row">
+          <input id="query" type="search" placeholder="搜索风格、项目、创意或使用场景" autocomplete="off">
+          <button type="submit" class="primary">查找灵感</button>
+        </div>
+        <div class="filter-row">
+          <select id="platform" aria-label="平台"><option value="">全部平台</option></select>
+          <select id="collection" aria-label="收藏夹"><option value="">全部收藏夹</option></select>
+          <select id="tagMatch" aria-label="标签匹配方式">
+            <option value="all">同时满足全部标签</option>
+            <option value="any">满足任一标签</option>
+          </select>
+          <label class="toggle"><input id="semantic" type="checkbox" checked> 语义补充</label>
+        </div>
+      </form>
+      <div id="activeFilters" class="active-filters"></div>
+      <div class="results-toolbar">
+        <div><strong id="resultCount">0</strong> 条素材 <span id="selectionCount" class="muted"></span></div>
+        <div class="selection-actions">
+          <button id="copyRefs" class="secondary" disabled>复制引用</button>
+          <button id="compareSelected" class="secondary" disabled>对比</button>
+          <button id="briefSelected" class="secondary" disabled>组合引用</button>
+          <button id="groupSelected" class="primary" disabled>保存为组合</button>
+        </div>
+      </div>
+      <div id="message" class="message" hidden></div>
+      <div id="results" class="grid"></div>
+      <div id="empty" class="empty" hidden>没有匹配的素材。可以减少标签或调整检索词。</div>
+    </section>
+  </main>
+
+  <dialog id="detailDialog" class="detail-dialog">
+    <div class="dialog-head"><button class="icon-button" data-close="detailDialog" aria-label="关闭">×</button></div>
+    <div id="detailContent"></div>
+  </dialog>
+
+  <dialog id="textDialog" class="text-dialog">
+    <div class="dialog-head"><h2 id="textDialogTitle">结果</h2><button class="icon-button" data-close="textDialog" aria-label="关闭">×</button></div>
+    <div id="textDialogContent"></div>
+  </dialog>
+
+  <dialog id="groupsDialog" class="list-dialog">
+    <div class="dialog-head"><h2>灵感组合</h2><button class="icon-button" data-close="groupsDialog" aria-label="关闭">×</button></div>
+    <div id="groupsList"></div>
+  </dialog>
+
+  <dialog id="groupDialog" class="form-dialog">
+    <div class="dialog-head"><h2 id="groupDialogTitle">保存灵感组合</h2><button class="icon-button" data-close="groupDialog" aria-label="关闭">×</button></div>
+    <form id="groupForm">
+      <input type="hidden" id="groupId">
+      <label>组合名称<input id="groupName" required maxlength="120"></label>
+      <label>组合说明<textarea id="groupDescription" rows="3"></textarea></label>
+      <div class="label">素材顺序</div>
+      <div id="groupItems" class="sortable-items"></div>
+      <button type="submit" class="primary">保存组合</button>
+    </form>
+  </dialog>
+
+  <dialog id="importsDialog" class="list-dialog">
+    <div class="dialog-head"><h2>导入与记录</h2><button class="icon-button" data-close="importsDialog" aria-label="关闭">×</button></div>
+    <div class="import-forms">
+      <form id="importUrlForm"><label>公开网页 URL<input id="importUrl" type="url" required placeholder="https://..."></label><button class="primary">导入网页</button></form>
+      <form id="importFileForm"><label>本地图片或项目文件路径<input id="importFile" required></label><button class="primary">导入文件</button></form>
+      <form id="importXhsForm"><label>小红书 JSON 路径<input id="importXhs" required placeholder="/path/to/xiaohongshu.json"></label><button class="primary">导入小红书</button></form>
+      <form id="importDouyinForm"><label>抖音收藏夹 JSON 路径<input id="importDouyin" required placeholder="/path/to/douyin.json"></label><button class="primary">导入抖音</button></form>
+    </div>
+    <h3>最近导入记录</h3>
+    <div id="importRecords" class="import-records"></div>
+  </dialog>
+
+  <dialog id="maintenanceDialog" class="list-dialog">
+    <div class="dialog-head"><h2>本地维护</h2><button class="icon-button" data-close="maintenanceDialog" aria-label="关闭">×</button></div>
+    <div class="maintenance-content">
+      <p class="muted">检查本地资产、重建检索索引，或备份全部数据与素材。</p>
+      <div class="detail-actions">
+        <button id="runHealth" class="secondary">健康检查</button>
+        <button id="runReindex" class="secondary">重建全部索引</button>
+        <button id="runBackup" class="primary">立即备份</button>
+      </div>
+      <div id="maintenanceResult" class="maintenance-result"></div>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
