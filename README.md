@@ -14,11 +14,13 @@
 - 封面颜色与布局相似搜索
 - 多素材对比、命名组合、Agent 引用与引用校验
 - 本地 Web 图库、健康检查、索引重建、ZIP 备份与恢复
+- 可选：通过本机浏览器一键增量更新指定收藏夹
+- 可选：macOS 桌面应用图标与一键启动器
 
 ## 先了解边界
 
-- 这是**本地素材管理与检索工具，不是自动爬虫**，不会自动登录或实时同步小红书/抖音。
-- 平台导入接收你合法获取的 JSON。请遵守平台规则；遇到验证码或风控应停止，不要尝试绕过。
+- 默认使用本地 JSON 导入；浏览器增量更新是可选功能，不会自动登录或实时同步小红书/抖音。
+- 请仅整理自己有权访问的内容并遵守平台规则；遇到验证码或风控会停止，不要尝试绕过。
 - 自动解读采用本地规则与图像统计，不是多模态大模型，也不会把素材发送给云端模型。
 - 服务没有登录鉴权，只绑定 `127.0.0.1`。不要改成 `0.0.0.0` 或暴露到公网。
 - 开源许可证仅覆盖本项目代码和自制示例。第三方笔记、封面等内容的权利归原作者或相关权利人。
@@ -33,7 +35,7 @@
 | 浏览器 | 最新版 Chrome、Edge、Firefox 或 Safari，仅用于打开本地页面 |
 | 网络 | 仅下载封面或读取公开网页时需要；示例和已有素材检索可离线运行 |
 
-不需要 Node.js、Docker、数据库服务、OpenAI/Claude API Key，也不需要安装小红书或抖音开发者工具。
+不需要 Node.js、Docker、数据库服务、OpenAI/Claude API Key，也不需要安装小红书或抖音开发者工具。可选的浏览器同步与桌面启动器仅在 macOS 上使用；同步另需 egolite 和 KimiCU，详见 [收藏夹更新指南](docs/SYNC.md)。
 
 macOS / Linux 的终端命令如下。Windows 可使用 PowerShell，将 `python3` 换成 `py -3`，并用 `.venv\Scripts\Activate.ps1` 激活虚拟环境。
 
@@ -147,6 +149,24 @@ python cli.py reindex
 
 也可以在图库右上角选择“导入与记录”，粘贴本机文件路径或公开 URL。
 
+## 可选：一键更新与桌面启动
+
+配置自己的收藏夹后，点击页面右上角“更新收藏”即可增量导入新增内容。收藏夹地址、账号核对信息和原始 JSON 都保存在本地，配置默认被 Git 忽略：
+
+```bash
+cp sync_sources.example.json sync_sources.json
+# 编辑 sync_sources.json 后运行
+python sync_collections.py
+```
+
+macOS 用户还可以安装带图标的桌面启动器：
+
+```bash
+python scripts/install_macos_launcher.py
+```
+
+完整配置、风控暂停规则和使用限制见 [收藏夹更新与桌面启动指南](docs/SYNC.md)。
+
 ## 标签检索与 Agent 引用
 
 ```bash
@@ -236,10 +256,15 @@ groups.py             命名组合
 maintenance.py        视觉索引、健康检查、备份恢复
 cli.py                命令行入口
 server.py             本地 FastAPI 服务
+sync_collections.py   可选的只读增量收藏更新
+sync_config.py        同步配置校验
+kimicu_mcp.py         本机浏览器控制接口
 static/               Web 图库
 extract_douyin_ax.py  离线 AX 快照转换器
+scripts/              macOS 桌面启动器安装与运行脚本
+assets/               自制应用图标
 examples/             可公开分发的虚构 JSON 与自制封面
-docs/                 导入和发布指南
+docs/                 导入、同步和发布指南
 ```
 
 ## 参与与发布

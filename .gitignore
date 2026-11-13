@@ -10,6 +10,7 @@ venv/
 /backups/
 /private/
 /exports/
+/sync_sources.json
 /小红书_*.json
 /抖音_*.json
 *.sqlite3

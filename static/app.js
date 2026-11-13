@@ -426,6 +426,56 @@ $("#runBackup").onclick = async () => {
   } finally { button.disabled = false; }
 };
 
+function renderSync(status) {
+  const labels = {done: "完成", needs_login: "等待登录", blocked: "等待处理验证", failed: "失败"};
+  const sources = (status.sources || []).map((source) => `${source.platform}:${source.collection}`).join("、");
+  const results = (status.results || []).map((result) => `<div class="import-row">
+    <strong>${escapeHtml(result.collection)}</strong> · ${escapeHtml(labels[result.status] || result.status)}
+    ${result.new !== undefined ? `<div>读取 ${result.found || 0} 条，新增 ${result.new} 条</div>` : ""}
+    ${result.cover_retries_succeeded ? `<div>封面重试成功 ${result.cover_retries_succeeded} 张</div>` : ""}
+    ${result.error ? `<div class="source">${escapeHtml(result.error)}</div>` : ""}
+  </div>`).join("");
+  const current = status.current ? `<p class="muted">${escapeHtml(status.current.collection || "")} ${status.current.round ? `· 第 ${status.current.round} 次读取` : ""}</p>` : "";
+  const configuration = status.configured === false ? `<p>尚未配置同步收藏夹。请复制 <code>sync_sources.example.json</code> 为 <code>sync_sources.json</code>，修改后重新打开本窗口。详见 <code>docs/SYNC.md</code>。</p>` : "";
+  const target = sources ? `<p class="muted">同步范围：${escapeHtml(sources)}</p>` : "";
+  $("#syncStatus").innerHTML = `${configuration}<p><strong>${escapeHtml(status.message || "尚未更新")}</strong></p>${target}${current}${results}`;
+  const running = status.state === "running";
+  $("#startSync").disabled = running || status.configured === false;
+  $("#startSync").textContent = running ? "正在更新…" : "开始更新";
+}
+
+async function pollSync() {
+  try {
+    const status = await api("/api/sync/collections");
+    renderSync(status);
+    if (status.state === "running") {
+      state.syncTimer = setTimeout(pollSync, 1500);
+    } else if (status.state !== "idle") {
+      await Promise.all([loadStats(), loadFilters(), loadTags(), search()]);
+    }
+  } catch (error) {
+    $("#syncStatus").textContent = error.message;
+  }
+}
+
+$("#openSync").onclick = async () => {
+  $("#syncDialog").showModal();
+  clearTimeout(state.syncTimer);
+  await pollSync();
+};
+
+$("#startSync").onclick = async () => {
+  clearTimeout(state.syncTimer);
+  $("#startSync").disabled = true;
+  try {
+    await api("/api/sync/collections", {method: "POST", body: "{}"});
+    await pollSync();
+  } catch (error) {
+    $("#startSync").disabled = false;
+    $("#syncStatus").textContent = error.message;
+  }
+};
+
 document.querySelectorAll("[data-close]").forEach((button) => { button.onclick = () => $("#" + button.dataset.close).close(); });
 submitImport("#importUrlForm", "/api/import/url", "url", "#importUrl");
 submitImport("#importFileForm", "/api/import/file", "path", "#importFile");

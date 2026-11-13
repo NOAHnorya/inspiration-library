@@ -1,0 +1,19 @@
+{
+  "browser_app": "com.citrolabs.ego.lite",
+  "sources": [
+    {
+      "key": "douyin_videos",
+      "platform": "douyin",
+      "collection": "视频灵感",
+      "profile_url": "https://www.douyin.com/user/self?from_tab_name=main&showSubTab=favorite_folder&showTab=favorite_collection",
+      "file": "private/douyin_videos.json"
+    },
+    {
+      "key": "xhs_notes",
+      "platform": "xiaohongshu",
+      "collection": "设计灵感",
+      "url": "https://www.xiaohongshu.com/board/000000000000000000000000?source=web_profile_page",
+      "file": "private/xiaohongshu_notes.json"
+    }
+  ]
+}

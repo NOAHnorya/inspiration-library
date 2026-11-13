@@ -47,8 +47,7 @@ def parse_lines(lines):
     return candidates
 
 
-def extract_file(path):
-    lines = Path(path).read_text(errors="replace").split("<mcp-result-extras>")[0].splitlines()
+def extract_lines(lines):
     lists = []
     for index, line in enumerate(lines):
         match = LIST_RE.match(line)
@@ -67,6 +66,11 @@ def extract_file(path):
     if not lists:
         return parse_lines(lines)
     return max(lists, key=len)
+
+
+def extract_file(path):
+    lines = Path(path).read_text(errors="replace").split("<mcp-result-extras>")[0].splitlines()
+    return extract_lines(lines)
 
 
 def main():

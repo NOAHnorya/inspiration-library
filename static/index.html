@@ -10,6 +10,7 @@
   <header class="topbar">
     <div class="brand">灵感库 <span id="libraryStats" class="muted"></span></div>
     <div class="top-actions">
+      <button id="openSync" class="primary">更新收藏</button>
       <button id="openGroups" class="secondary">灵感组合</button>
       <button id="openImports" class="secondary">导入与记录</button>
       <button id="openMaintenance" class="secondary">维护</button>
@@ -91,6 +92,14 @@
     </div>
     <h3>最近导入记录</h3>
     <div id="importRecords" class="import-records"></div>
+  </dialog>
+
+  <dialog id="syncDialog" class="list-dialog">
+    <div class="dialog-head"><h2>更新收藏</h2><button class="icon-button" data-close="syncDialog" aria-label="关闭">×</button></div>
+    <p class="muted">通过配置的浏览器只读更新指定收藏夹。只导入新条目，慢速滚动，不点赞、不关注、不评论。</p>
+    <p class="muted">更新期间请不要操作新开的同步标签页。需要登录、验证码或风控处理时，会暂停并等待你接管。</p>
+    <div id="syncStatus" class="maintenance-result"></div>
+    <div class="detail-actions"><button id="startSync" class="primary">开始更新</button></div>
   </dialog>
 
   <dialog id="maintenanceDialog" class="list-dialog">

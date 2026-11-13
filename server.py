@@ -1,5 +1,8 @@
+import json
 import os
 from pathlib import Path
+import subprocess
+import sys
 from typing import List, Optional
 
 from fastapi import FastAPI, Query, Body
@@ -12,6 +15,7 @@ from tagging import Catalog
 from agent_tools import AgentTools
 from groups import Groups
 from maintenance import Maintenance
+from sync_config import load_sync_config, public_sources, resolve_config_path
 
 library = Library()
 catalog = Catalog(library)
@@ -209,6 +213,68 @@ def maintenance_reindex():
 @app.post("/api/maintenance/backup")
 def maintenance_backup(data: dict = Body(default={})):
     return maintenance.backup(data.get("output"))
+
+
+def sync_configuration():
+    try:
+        config = load_sync_config()
+        return {"configured": True, "sources": public_sources(config)}
+    except (ValueError, OSError, json.JSONDecodeError) as exc:
+        return {"configured": False, "sources": [], "configuration_error": str(exc)}
+
+
+def read_sync_status():
+    path = library.data_dir / "sync_status.json"
+    status = {"state": "idle", "message": "尚未更新", "results": []}
+    if path.exists():
+        status = json.loads(path.read_text(encoding="utf-8"))
+    status.update(sync_configuration())
+    return status
+
+
+@app.get("/api/sync/collections")
+def get_sync_status():
+    return read_sync_status()
+
+
+@app.post("/api/sync/collections")
+def start_collection_sync(data: dict = Body(default={})):
+    current = read_sync_status()
+    pid = current.get("pid")
+    if current.get("state") == "running" and pid:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            pass
+        else:
+            raise ValueError("收藏更新正在进行，请勿重复启动")
+    config = load_sync_config()
+    allowed = {source["key"] for source in config["sources"]}
+    selected = list(dict.fromkeys(data.get("sources", [])))
+    if any(key not in allowed for key in selected):
+        raise ValueError("未知的收藏夹")
+    command = [sys.executable, str(ROOT / "sync_collections.py"), "--config", config["config_path"]]
+    for key in selected:
+        command.extend(["--only", key])
+    log_path = library.data_dir / "sync.log"
+    with log_path.open("ab") as log:
+        process = subprocess.Popen(
+            command,
+            cwd=ROOT,
+            env=dict(os.environ, INSPIRATION_DATA_DIR=str(library.data_dir),
+                     INSPIRATION_SYNC_CONFIG=config["config_path"], PYTHONDONTWRITEBYTECODE="1"),
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+    status = {"state": "running", "pid": process.pid, "started_at": now(),
+              "message": "正在启动只读更新", "results": []}
+    path = library.data_dir / "sync_status.json"
+    temporary = path.with_suffix(".start.tmp")
+    temporary.write_text(json.dumps(status, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(path)
+    return {"ok": True, "status": status}
 
 
 @app.get("/")
