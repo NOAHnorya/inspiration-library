@@ -132,28 +132,41 @@ def navigate(client, app, url, new_tab=False):
 
 
 def open_douyin_collection(client, app, source):
+    collection_found = False
     for _ in range(15):
         pages = client.full_tree()
         text = "\n".join(page_text(client, page) for page in pages)
         ensure_safe(text, "douyin")
         account_marker = source.get("account_marker", "")
-        if source["collection"] in text and (not account_marker or account_marker in text):
-            break
-        time.sleep(2)
-    else:
-        raise NeedsLogin("抖音收藏夹不可读，请检查浏览器登录状态后重试。")
-    for page in pages:
-        lines = page_text(client, page).splitlines()
-        target = next((index for index, line in enumerate(lines)
-                       if line.strip().endswith('AXStaticText = "' + source["collection"] + '"')), None)
-        if target is None:
+        if account_marker and account_marker not in text:
+            time.sleep(2)
             continue
-        index = clickable_ancestor(lines, target)
-        client.call("click", {"app": app, "index": index,
-                              "snapshot_id": page["structuredContent"]["snapshot_id"]})
-        time.sleep(3)
-        return
-    raise RuntimeError("没有找到抖音收藏夹: " + source["collection"])
+        for page in pages:
+            lines = page_text(client, page).splitlines()
+            target = next((index for index, line in enumerate(lines)
+                           if line.strip().endswith('AXStaticText = "' + source["collection"] + '"')), None)
+            if target is None:
+                continue
+            collection_found = True
+            try:
+                index = clickable_ancestor(lines, target)
+            except RuntimeError:
+                continue
+            client.call("click", {"app": app, "index": index,
+                                  "snapshot_id": page["structuredContent"]["snapshot_id"]})
+            time.sleep(3)
+            for _ in range(15):
+                pages = client.full_tree()
+                text = "\n".join(page_text(client, page) for page in pages)
+                ensure_safe(text, "douyin")
+                if parse_douyin_pages(client, pages, source["collection"]):
+                    return
+                time.sleep(2)
+            raise RuntimeError(source["collection"] + " 打开后仍未读取到作品，请检查网络后重试")
+        time.sleep(2)
+    if collection_found:
+        raise RuntimeError("抖音收藏夹卡片尚未就绪，请重试: " + source["collection"])
+    raise NeedsLogin("抖音收藏夹不可读，请检查浏览器登录状态后重试。")
 
 
 def collect(client, app, source, known_ids, status):
@@ -256,6 +269,33 @@ def import_new(library, catalog, source, records, data_dir):
             "cover_retries_succeeded": retries}
 
 
+def source_path(source):
+    path = Path(source["file"]).expanduser()
+    return path if path.is_absolute() else ROOT / path
+
+
+def backfill_collection_positions(library, sources):
+    results = []
+    for source in sources:
+        path = source_path(source)
+        if not path.exists():
+            results.append({"key": source["key"], "updated": 0, "missing_file": True})
+            continue
+        records = json.loads(path.read_text(encoding="utf-8"))
+        prefix = "ins_douyin_" if source["platform"] == "douyin" else "ins_xhs_"
+        updated = 0
+        with library.connect() as conn:
+            for position, record in enumerate(records):
+                item_id = native_id(record)
+                if not item_id:
+                    continue
+                cursor = conn.execute("UPDATE items SET collection_position=? WHERE id=?",
+                                      (position, prefix + item_id))
+                updated += cursor.rowcount
+        results.append({"key": source["key"], "updated": updated})
+    return {"sources": results, "updated": sum(result["updated"] for result in results)}
+
+
 class Status:
     def __init__(self, path):
         self.path = path
@@ -300,14 +340,13 @@ def run(keys=None, config_path=None):
                         open_douyin_collection(client, app, source)
                     else:
                         navigate(client, app, source["url"])
-                    path = Path(source["file"]).expanduser()
-                    if not path.is_absolute():
-                        path = ROOT / path
+                    path = source_path(source)
                     existing = json.loads(path.read_text(encoding="utf-8")) if path.exists() else []
                     known_ids = {native_id(record) for record in existing if native_id(record)}
                     records = collect(client, app, source, known_ids, status)
                     new_records = merge_records(path, records)
                     imported = import_new(library, catalog, source, new_records, data_dir)
+                    backfill_collection_positions(library, [source])
                     total_new += len(new_records)
                     result = {"key": source["key"], "platform": source["platform"],
                               "collection": source["collection"], "status": "done",
@@ -349,8 +388,13 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config")
     parser.add_argument("--only", action="append")
+    parser.add_argument("--rebuild-order", action="store_true")
     args = parser.parse_args()
-    result = run(args.only, args.config)
+    if args.rebuild_order:
+        config = load_sync_config(args.config)
+        result = backfill_collection_positions(Library(), config["sources"])
+    else:
+        result = run(args.only, args.config)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 
 

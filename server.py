@@ -78,8 +78,8 @@ def health():
 def search_items(q: str = "", tags: List[str] = Query([]), match: str = "all",
                  exclude: List[str] = Query([]), platform: str = "", collection: str = "",
                  limit: int = Query(60, ge=1, le=200), offset: int = Query(0, ge=0),
-                 semantic: bool = True, min_score: float = 0.16):
-    return catalog.search(q, tags, match, exclude, platform, collection, limit, offset, semantic, min_score)
+                 semantic: bool = True, min_score: float = 0.16, sort: str = "relevance"):
+    return catalog.search(q, tags, match, exclude, platform, collection, limit, offset, semantic, min_score, sort)
 
 
 @app.get("/api/items/{item_id}")

@@ -54,6 +54,7 @@ function queryString() {
   if ($("#platform").value) params.set("platform", $("#platform").value);
   if ($("#collection").value) params.set("collection", $("#collection").value);
   params.set("match", $("#tagMatch").value);
+  params.set("sort", $("#sortOrder").value);
   state.include.forEach((tag) => params.append("tags", tag));
   state.exclude.forEach((tag) => params.append("exclude", tag));
   return params;
@@ -351,6 +352,7 @@ async function submitImport(formId, endpoint, valueKey, inputId) {
 $("#searchForm").onsubmit = (event) => { event.preventDefault(); search(); };
 $("#platform").onchange = search;
 $("#collection").onchange = search;
+$("#sortOrder").onchange = search;
 $("#tagMatch").onchange = search;
 $("#semantic").onchange = search;
 $("#tagFilter").oninput = () => { clearTimeout(state.tagTimer); state.tagTimer = setTimeout(loadTags, 180); };

@@ -55,6 +55,7 @@ def main():
     search.add_argument("--offset", type=int, default=0)
     search.add_argument("--no-semantic", action="store_true")
     search.add_argument("--min-score", type=float, default=0.16)
+    search.add_argument("--sort", choices=["relevance", "collection_asc", "collection_desc"], default="relevance")
     tags = commands.add_parser("tags")
     tags.add_argument("--query", default="")
     update = commands.add_parser("update")
@@ -154,7 +155,7 @@ def main():
             emit({"ok": True, "count": len(items), "provider": "local_rules_visual_v1"})
     elif args.command == "search":
         emit(catalog.search(args.q, args.tag, args.match, args.exclude, args.platform,
-                            args.collection, args.limit, args.offset, not args.no_semantic, args.min_score))
+                            args.collection, args.limit, args.offset, not args.no_semantic, args.min_score, args.sort))
     elif args.command == "tags":
         emit(catalog.list_tags(args.query))
     elif args.command == "update":

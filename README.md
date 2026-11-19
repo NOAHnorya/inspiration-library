@@ -179,6 +179,10 @@ python cli.py search --tag 复古 --tag Y2K --match any
 # 排除标签，并限定收藏夹
 python cli.py search --tag 海报 --exclude 暗色调 --collection 我的收藏夹
 
+# 按收藏夹页面原始顺序正向或反向浏览
+python cli.py search --collection 我的收藏夹 --sort collection_asc
+python cli.py search --collection 我的收藏夹 --sort collection_desc
+
 # Agent 友好的精简结果，包含 @稳定引用 ID
 python cli.py find "复古未来主义 网页" --limit 5
 

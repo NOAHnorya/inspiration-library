@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS items (
     author TEXT NOT NULL DEFAULT '',
     url TEXT NOT NULL DEFAULT '',
     collection TEXT NOT NULL DEFAULT '',
+    collection_position INTEGER,
     cover_url TEXT NOT NULL DEFAULT '',
     source_json TEXT NOT NULL DEFAULT '{}',
     annotation_json TEXT NOT NULL DEFAULT '{}',
@@ -173,6 +174,10 @@ class Library:
         self._local = threading.local()
         with self.connect() as conn:
             conn.executescript(SCHEMA)
+            columns = {row[1] for row in conn.execute("PRAGMA table_info(items)")}
+            if "collection_position" not in columns:
+                conn.execute("ALTER TABLE items ADD COLUMN collection_position INTEGER")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_items_collection_position ON items(platform,collection,collection_position)")
 
     @contextmanager
     def connect(self):
@@ -212,17 +217,18 @@ class Library:
         with self.connect() as conn:
             exists = conn.execute("SELECT 1 FROM items WHERE id=?", (item_id,)).fetchone()
             conn.execute("""
-                INSERT INTO items(id,platform,native_id,title,author,url,collection,cover_url,source_json,annotation_json,notes,import_status,created_at,updated_at)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                INSERT INTO items(id,platform,native_id,title,author,url,collection,collection_position,cover_url,source_json,annotation_json,notes,import_status,created_at,updated_at)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(id) DO UPDATE SET
                     platform=excluded.platform,native_id=excluded.native_id,title=excluded.title,
                     author=excluded.author,url=excluded.url,collection=excluded.collection,
+                    collection_position=COALESCE(excluded.collection_position,items.collection_position),
                     cover_url=excluded.cover_url,source_json=excluded.source_json,
                     import_status=excluded.import_status,updated_at=excluded.updated_at
             """, (
                 item_id, item["platform"], item.get("native_id"), item.get("title") or "未命名素材",
                 item.get("author", ""), item.get("url", ""), item.get("collection", ""),
-                item.get("cover_url", ""), safe_json(source), safe_json(annotation),
+                item.get("collection_position"), item.get("cover_url", ""), safe_json(source), safe_json(annotation),
                 item.get("notes", ""), item.get("import_status", "ready"),
                 timestamp if not exists else conn.execute("SELECT created_at FROM items WHERE id=?", (item_id,)).fetchone()[0],
                 timestamp,
@@ -282,7 +288,7 @@ class Library:
         if not isinstance(records, list):
             raise ValueError("小红书导入文件必须是 JSON 数组")
         results = []
-        for record in records:
+        for position, record in enumerate(records):
             source_value = str(source_path) + "#" + str(record.get("url", ""))
             try:
                 url = record["url"]
@@ -295,6 +301,7 @@ class Library:
                     "id": item_id, "platform": "xiaohongshu", "native_id": native_id,
                     "title": record.get("title") or "未命名素材", "author": record.get("author", ""),
                     "url": url, "collection": record.get("collection", ""),
+                    "collection_position": record.get("collection_position", position),
                     "cover_url": record.get("cover", ""), "source": record,
                     "import_status": "ready",
                 })
@@ -321,7 +328,7 @@ class Library:
         if not isinstance(records, list):
             raise ValueError("抖音导入文件必须是 JSON 数组")
         results = []
-        for record in records:
+        for position, record in enumerate(records):
             source_value = str(source_path) + "#" + str(record.get("url", ""))
             try:
                 url = record["url"]
@@ -334,6 +341,7 @@ class Library:
                     "id": item_id, "platform": "douyin", "native_id": native_id,
                     "title": record.get("title") or "未命名素材", "author": record.get("author", ""),
                     "url": url, "collection": record.get("collection", ""),
+                    "collection_position": record.get("collection_position", position),
                     "cover_url": record.get("cover", ""), "source": record,
                     "import_status": "ready",
                 })
