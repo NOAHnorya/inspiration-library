@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Check syntax and command-line entry points
+        run: |
+          python -m compileall -q -x 'launcher_template[.]py$' .
+          python cli.py --help
+          python sync_collections.py --help
+          python - <<'PY'
+          from sync_config import load_sync_config
+
+          config = load_sync_config('sync_sources.example.json')
+          assert len(config['sources']) == 2
+          print('Example sync configuration: OK')
+          PY
+      - name: Smoke test imports and collection ordering
+        env:
+          INSPIRATION_DATA_DIR: ${{ runner.temp }}/inspiration-ci-data
+        run: |
+          python - <<'PY'
+          from core import Library
+          from tagging import Catalog
+
+          library = Library()
+          assert library.import_xhs('examples/xiaohongshu.json', download=False)[0]['status'] == 'ready'
+          assert library.import_douyin('examples/douyin.json', download=False)[0]['status'] == 'ready'
+          library.upsert_item({
+              'id': 'ins_xhs_000000000000000000000002',
+              'platform': 'xiaohongshu',
+              'native_id': '000000000000000000000002',
+              'title': '示例：第二个收藏条目',
+              'url': 'https://www.xiaohongshu.com/explore/000000000000000000000002',
+              'collection': '示例收藏夹',
+              'collection_position': 1,
+          })
+          catalog = Catalog(library)
+          ascending = catalog.search(platform='xiaohongshu', collection='示例收藏夹', sort='collection_asc')
+          descending = catalog.search(platform='xiaohongshu', collection='示例收藏夹', sort='collection_desc')
+          assert [item['collection_position'] for item in ascending['items']] == [0, 1]
+          assert [item['collection_position'] for item in descending['items']] == [1, 0]
+          print('Imports and collection ordering: OK')
+          PY

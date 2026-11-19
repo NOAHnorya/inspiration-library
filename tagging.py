@@ -341,12 +341,12 @@ class Catalog:
         for tag in exclude or []:
             clauses.append("NOT EXISTS(SELECT 1 FROM item_tags WHERE item_id=items.id AND name=?)")
             params.append(normalize_tag(tag))
-        sql = "SELECT id,search_text FROM items"
+        sql = "SELECT id,search_text,collection_position FROM items"
         if clauses:
             sql += " WHERE " + " AND ".join(clauses)
         with self.library.connect() as conn:
             rows = conn.execute(sql, params).fetchall()
-        return [(r["id"], r["search_text"]) for r in rows]
+        return [(r["id"], r["search_text"], r["collection_position"]) for r in rows]
 
     def fts_matches(self, terms):
         if not terms or any(len(term) < 3 for term in terms):
@@ -364,7 +364,9 @@ class Catalog:
             return {}
 
     def search(self, q="", tags=None, match="all", exclude=None, platform="", collection="",
-               limit=20, offset=0, semantic=True, min_score=0.16):
+               limit=20, offset=0, semantic=True, min_score=0.16, sort="relevance"):
+        if sort not in {"relevance", "collection_asc", "collection_desc"}:
+            raise ValueError("不支持的排序方式")
         candidates = self.structured_ids(tags, match, exclude, platform, collection)
         terms = [term.lower() for term in re.findall(r"[^\s]+", q.strip())]
         lexical_fts = self.fts_matches(terms)
@@ -374,10 +376,10 @@ class Catalog:
             placeholders = ",".join("?" for _ in candidates)
             with self.library.connect() as conn:
                 rows = conn.execute("SELECT item_id,vector_json FROM vectors WHERE item_id IN (" + placeholders + ")",
-                                    [item_id for item_id, _ in candidates]).fetchall()
+                                    [item_id for item_id, _, _ in candidates]).fetchall()
             vectors = {r["item_id"]: np.asarray(json.loads(r["vector_json"]), dtype=np.float32) for r in rows}
         scored = []
-        for item_id, text in candidates:
+        for item_id, text, position in candidates:
             lowered = text.lower()
             lexical = 0.0
             if terms:
@@ -396,18 +398,23 @@ class Catalog:
                 score = lexical
             if q and score < min_score:
                 continue
-            scored.append((item_id, score, lexical, similarity))
-        scored.sort(key=lambda value: (-value[1], value[0]))
+            scored.append((item_id, score, lexical, similarity, position))
+        if sort == "collection_asc":
+            scored.sort(key=lambda value: (value[4] is None, value[4] if value[4] is not None else 0, -value[1], value[0]))
+        elif sort == "collection_desc":
+            scored.sort(key=lambda value: (value[4] is None, -(value[4] if value[4] is not None else 0), value[1], value[0]))
+        else:
+            scored.sort(key=lambda value: (-value[1], value[0]))
         total = len(scored)
         selected = scored[offset:offset + limit]
         items = []
-        for item_id, score, lexical, similarity in selected:
+        for item_id, score, lexical, similarity, position in selected:
             item = self.library.get_item(item_id)
             item["score"] = round(score, 4)
             item["match_detail"] = {"lexical": round(lexical, 4), "semantic": round(similarity, 4)}
             items.append(item)
         return {"items": items, "total": total, "query": q, "tags": tags or [], "match": match,
-                "exclude": exclude or [], "offset": offset, "limit": limit,
+                "exclude": exclude or [], "offset": offset, "limit": limit, "sort": sort,
                 "semantic_provider": "local_ngram_alias_v1" if semantic else "disabled"}
 
     def evaluate(self, benchmark_path):
