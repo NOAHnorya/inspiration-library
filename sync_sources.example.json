@@ -1,4 +1,5 @@
 {
+  "driver": "auto",
   "browser_app": "com.citrolabs.ego.lite",
   "sources": [
     {

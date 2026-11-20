@@ -24,6 +24,7 @@ jobs:
           python -m compileall -q -x 'launcher_template[.]py$' .
           python cli.py --help
           python sync_collections.py --help
+          python sync_collections.py --list-drivers
           python - <<'PY'
           from sync_config import load_sync_config
 
@@ -58,3 +59,33 @@ jobs:
           assert [item['collection_position'] for item in descending['items']] == [1, 0]
           print('Imports and collection ordering: OK')
           PY
+      - name: Smoke test MCP server
+        env:
+          INSPIRATION_DATA_DIR: ${{ runner.temp }}/inspiration-ci-data
+        run: |
+          python - <<'PY'
+          import json, subprocess, sys
+
+          server = subprocess.Popen([sys.executable, 'mcp_server.py'], stdin=subprocess.PIPE,
+                                    stdout=subprocess.PIPE, text=True)
+          def rpc(i, method, params=None):
+              server.stdin.write(json.dumps({'jsonrpc': '2.0', 'id': i, 'method': method, 'params': params or {}}) + '\n')
+              server.stdin.flush()
+              return json.loads(server.stdout.readline())
+          assert rpc(1, 'initialize', {'protocolVersion': '2025-06-18'})['result']['serverInfo']['name'] == 'inspiration-library'
+          tools = {tool['name'] for tool in rpc(2, 'tools/list')['result']['tools']}
+          assert {'find_inspiration', 'submit_collection_records', 'sync_collections'} <= tools
+          found = rpc(3, 'tools/call', {'name': 'find_inspiration', 'arguments': {'query': '示例'}})
+          assert not found['result']['isError']
+          server.stdin.close()
+          server.wait()
+          print('MCP server: OK')
+          PY
+      - name: Smoke test agent setup in a sandbox home
+        run: |
+          mkdir -p "$RUNNER_TEMP/home"
+          HOME="$RUNNER_TEMP/home" python cli.py --data-dir "$RUNNER_TEMP/inspiration-ci-data" init --agent codex \
+            --xhs "https://www.xiaohongshu.com/board/000000000000000000000000" --xhs-name 示例 \
+            --config "$RUNNER_TEMP/sync_sources.json" --yes
+          grep -q "mcp_servers.inspiration" "$RUNNER_TEMP/home/.codex/config.toml"
+          test -f "$RUNNER_TEMP/home/.agents/skills/inspiration-library/SKILL.md"

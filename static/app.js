@@ -429,16 +429,18 @@ $("#runBackup").onclick = async () => {
 };
 
 function renderSync(status) {
-  const labels = {done: "完成", needs_login: "等待登录", blocked: "等待处理验证", failed: "失败"};
+  const labels = {done: "完成", needs_login: "等待登录", blocked: "等待处理验证", failed: "失败", waiting_for_agent: "等待你的 Agent 读取"};
+  const driverNames = {"ego-browser": "ego lite", kimicu: "KimiCU", handoff: "你的 Agent"};
   const sources = (status.sources || []).map((source) => `${source.platform}:${source.collection}`).join("、");
   const results = (status.results || []).map((result) => `<div class="import-row">
-    <strong>${escapeHtml(result.collection)}</strong> · ${escapeHtml(labels[result.status] || result.status)}
+    <strong>${escapeHtml(result.collection)}</strong> · ${escapeHtml(labels[result.status] || result.status)}${result.driver ? ` · ${escapeHtml(driverNames[result.driver] || result.driver)}` : ""}
     ${result.new !== undefined ? `<div>读取 ${result.found || 0} 条，新增 ${result.new} 条</div>` : ""}
     ${result.cover_retries_succeeded ? `<div>封面重试成功 ${result.cover_retries_succeeded} 张</div>` : ""}
     ${result.error ? `<div class="source">${escapeHtml(result.error)}</div>` : ""}
+    ${result.task_path ? `<div class="source">任务文件：${escapeHtml(result.task_path)}。在你的 Agent 里说“读取灵感库待同步任务”即可。</div>` : ""}
   </div>`).join("");
   const current = status.current ? `<p class="muted">${escapeHtml(status.current.collection || "")} ${status.current.round ? `· 第 ${status.current.round} 次读取` : ""}</p>` : "";
-  const configuration = status.configured === false ? `<p>尚未配置同步收藏夹。请复制 <code>sync_sources.example.json</code> 为 <code>sync_sources.json</code>，修改后重新打开本窗口。详见 <code>docs/SYNC.md</code>。</p>` : "";
+  const configuration = status.configured === false ? `<p>尚未配置同步收藏夹。在终端运行 <code>python cli.py init</code>，或让你的 Agent 按 <code>AGENT_SETUP.md</code> 帮你配置，然后重新打开本窗口。详见 <code>docs/SYNC.md</code>。</p>` : "";
   const target = sources ? `<p class="muted">同步范围：${escapeHtml(sources)}</p>` : "";
   $("#syncStatus").innerHTML = `${configuration}<p><strong>${escapeHtml(status.message || "尚未更新")}</strong></p>${target}${current}${results}`;
   const running = status.state === "running";
