@@ -4,6 +4,14 @@
 
 **你的收藏内容不属于开源代码。** 数据库、封面、原始收藏 JSON 和备份默认都不会进入 Git。
 
+## 用你自己的 Agent 一句话装好
+
+不管你用 Claude Code、Codex、Cursor、Kimi Code、DSH、Gemini CLI 还是 OpenClaw，把这句话发给它：
+
+> **请按 https://github.com/NOAHnorya/inspiration-library 的 AGENT_SETUP.md 帮我装好灵感库。**
+
+它会问你用的是哪个 Agent、要同步哪些收藏夹，然后装好依赖、接入 MCP、配置同步。想自己动手，往下看“5 分钟跑起来”，最后运行 `python cli.py init`。
+
 ## 功能
 
 - 统一导入小红书、抖音收藏 JSON、公开网页和本地文件
@@ -14,7 +22,9 @@
 - 封面颜色与布局相似搜索
 - 多素材对比、命名组合、Agent 引用与引用校验
 - 本地 Web 图库、健康检查、索引重建、ZIP 备份与恢复
-- 可选：通过本机浏览器一键增量更新指定收藏夹
+- 可选：一键增量更新指定收藏夹，“读取的手”可替换：ego lite 自带接口 / KimiCU / 交给你自己的 Agent
+- 支持任意 Agent：MCP 服务（零额外依赖）+ 命令行 JSON 输出 + `AGENTS.md` / Skill
+- `python cli.py init` 引导：先问你用哪个 Agent，再写对应配置（改动前自动备份）
 - 可选：macOS 桌面应用图标与一键启动器
 
 ## 先了解边界
@@ -35,7 +45,7 @@
 | 浏览器 | 最新版 Chrome、Edge、Firefox 或 Safari，仅用于打开本地页面 |
 | 网络 | 仅下载封面或读取公开网页时需要；示例和已有素材检索可离线运行 |
 
-不需要 Node.js、Docker、数据库服务、OpenAI/Claude API Key，也不需要安装小红书或抖音开发者工具。可选的浏览器同步与桌面启动器仅在 macOS 上使用；同步另需 egolite 和 KimiCU，详见 [收藏夹更新指南](docs/SYNC.md)。
+不需要 Node.js、Docker、数据库服务、OpenAI/Claude API Key，也不需要安装小红书或抖音开发者工具。可选的收藏夹同步需要 ego lite（macOS / Windows）、KimiCU（macOS）或一个带浏览器工具的 Agent 三者之一；桌面启动器仅限 macOS。详见 [收藏夹更新指南](docs/SYNC.md)。
 
 macOS / Linux 的终端命令如下。Windows 可使用 PowerShell，将 `python3` 换成 `py -3`，并用 `.venv\Scripts\Activate.ps1` 激活虚拟环境。
 
@@ -149,23 +159,33 @@ python cli.py reindex
 
 也可以在图库右上角选择“导入与记录”，粘贴本机文件路径或公开 URL。
 
-## 可选：一键更新与桌面启动
+## 可选：一键更新收藏夹
 
-配置自己的收藏夹后，点击页面右上角“更新收藏”即可增量导入新增内容。收藏夹地址、账号核对信息和原始 JSON 都保存在本地，配置默认被 Git 忽略：
-
-```bash
-cp sync_sources.example.json sync_sources.json
-# 编辑 sync_sources.json 后运行
-python sync_collections.py
-```
-
-macOS 用户还可以安装带图标的桌面启动器：
+运行 `python cli.py init` 添加收藏夹后，点击图库右上角“更新收藏”，或运行：
 
 ```bash
-python scripts/install_macos_launcher.py
+python cli.py sync              # 全部收藏夹
+python cli.py sync --only xhs_1 # 只更新一个
+python cli.py doctor            # 查看可用的同步方式
 ```
 
-完整配置、风控暂停规则和使用限制见 [收藏夹更新与桌面启动指南](docs/SYNC.md)。
+同步只读、增量，读到连续 20 条已入库内容就停。负责打开浏览器读取的“手”按顺序自动选择：
+
+| 方式 | 需要什么 | 说明 |
+| --- | --- | --- |
+| `ego-browser`（推荐） | [ego lite](https://lite.ego.app/)，并在其中登录小红书 / 抖音 | 在独立任务空间里运行，不占用你的鼠标和标签页；直接读网页里的链接，最稳定。macOS / Windows |
+| `kimicu` | KimiCU，并授予辅助功能权限 | 读取 macOS 辅助功能树。仅 macOS |
+| `handoff` | 任何带浏览器工具的 Agent | 灵感库生成读取任务，你的 Agent 用它自己的浏览器读，再通过 MCP `submit_collection_records` 交回 |
+
+也可以在 `sync_sources.json` 里用 `"driver"` 为全部或单个收藏夹指定方式。遇到登录、验证码或风控时会暂停，由你本人在浏览器里处理，不会尝试绕过。详见 [收藏夹更新指南](docs/SYNC.md)。
+
+macOS 桌面启动器：`python scripts/install_macos_launcher.py`。
+
+## 接入任意 Agent
+
+- **MCP**：`python mcp_server.py` 提供 13 个工具（检索、详情含封面图、对比、参考稿、引用校验、相似封面、同步、提交 Agent 读取结果等）。`python cli.py init --agent <名字>` 会自动写入对应 Agent 的配置。
+- **命令行**：所有命令输出 JSON，没有 MCP 的 Agent 也能直接用。
+- **说明书**：[AGENTS.md](AGENTS.md) 和 `skills/inspiration-library/SKILL.md`，告诉 Agent 何时、如何使用灵感库，以及必须遵守的只读和隐私规则。
 
 ## 标签检索与 Agent 引用
 
@@ -260,9 +280,16 @@ groups.py             命名组合
 maintenance.py        视觉索引、健康检查、备份恢复
 cli.py                命令行入口
 server.py             本地 FastAPI 服务
+mcp_server.py         MCP 服务（任意 Agent 接入）
+agent_setup.py        各 Agent 的 MCP / Skill 配置写入
+wizard.py             cli.py init / doctor 引导
 sync_collections.py   可选的只读增量收藏更新
 sync_config.py        同步配置校验
-kimicu_mcp.py         本机浏览器控制接口
+drivers/              同步驱动：ego-browser、KimiCU、交给 Agent
+kimicu_mcp.py         KimiCU 客户端
+AGENTS.md             给 Agent 的使用说明
+AGENT_SETUP.md        让 Agent 帮用户安装的步骤
+skills/               可安装的 Agent Skill
 static/               Web 图库
 extract_douyin_ax.py  离线 AX 快照转换器
 scripts/              macOS 桌面启动器安装与运行脚本

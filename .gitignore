@@ -11,6 +11,8 @@ venv/
 /private/
 /exports/
 /sync_sources.json
+/.mcp.json
+*.bak-inspiration-*
 /小红书_*.json
 /抖音_*.json
 *.sqlite3

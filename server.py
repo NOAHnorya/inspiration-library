@@ -16,6 +16,8 @@ from agent_tools import AgentTools
 from groups import Groups
 from maintenance import Maintenance
 from sync_config import load_sync_config, public_sources, resolve_config_path
+from sync_collections import read_status as sync_read_status, spawn as sync_spawn
+from drivers import detect as detect_drivers, resolve_driver_name
 
 library = Library()
 catalog = Catalog(library)
@@ -78,7 +80,7 @@ def health():
 def search_items(q: str = "", tags: List[str] = Query([]), match: str = "all",
                  exclude: List[str] = Query([]), platform: str = "", collection: str = "",
                  limit: int = Query(60, ge=1, le=200), offset: int = Query(0, ge=0),
-                 semantic: bool = True, min_score: float = 0.16, sort: str = "relevance"):
+                 semantic: bool = True, min_score: float = 0.16, sort: str = "collection_asc"):
     return catalog.search(q, tags, match, exclude, platform, collection, limit, offset, semantic, min_score, sort)
 
 
@@ -224,10 +226,7 @@ def sync_configuration():
 
 
 def read_sync_status():
-    path = library.data_dir / "sync_status.json"
-    status = {"state": "idle", "message": "尚未更新", "results": []}
-    if path.exists():
-        status = json.loads(path.read_text(encoding="utf-8"))
+    status = sync_read_status(library.data_dir)
     status.update(sync_configuration())
     return status
 
@@ -237,43 +236,14 @@ def get_sync_status():
     return read_sync_status()
 
 
+@app.get("/api/sync/drivers")
+def get_sync_drivers():
+    return {"drivers": detect_drivers(), "auto": resolve_driver_name("auto")}
+
+
 @app.post("/api/sync/collections")
 def start_collection_sync(data: dict = Body(default={})):
-    current = read_sync_status()
-    pid = current.get("pid")
-    if current.get("state") == "running" and pid:
-        try:
-            os.kill(pid, 0)
-        except ProcessLookupError:
-            pass
-        else:
-            raise ValueError("收藏更新正在进行，请勿重复启动")
-    config = load_sync_config()
-    allowed = {source["key"] for source in config["sources"]}
-    selected = list(dict.fromkeys(data.get("sources", [])))
-    if any(key not in allowed for key in selected):
-        raise ValueError("未知的收藏夹")
-    command = [sys.executable, str(ROOT / "sync_collections.py"), "--config", config["config_path"]]
-    for key in selected:
-        command.extend(["--only", key])
-    log_path = library.data_dir / "sync.log"
-    with log_path.open("ab") as log:
-        process = subprocess.Popen(
-            command,
-            cwd=ROOT,
-            env=dict(os.environ, INSPIRATION_DATA_DIR=str(library.data_dir),
-                     INSPIRATION_SYNC_CONFIG=config["config_path"], PYTHONDONTWRITEBYTECODE="1"),
-            stdin=subprocess.DEVNULL,
-            stdout=log,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-    status = {"state": "running", "pid": process.pid, "started_at": now(),
-              "message": "正在启动只读更新", "results": []}
-    path = library.data_dir / "sync_status.json"
-    temporary = path.with_suffix(".start.tmp")
-    temporary.write_text(json.dumps(status, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    temporary.replace(path)
+    status = sync_spawn(data.get("sources", []), driver=data.get("driver"), data_dir=library.data_dir)
     return {"ok": True, "status": status}
 
 

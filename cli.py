@@ -1,10 +1,13 @@
 import argparse
 import hashlib
 import json
+import os
 import sys
 from pathlib import Path
 
+from agent_setup import AGENT_IDS
 from core import Library, ROOT
+from wizard import doctor, run_init
 from tagging import Catalog
 from agent_tools import AgentTools
 from maintenance import Maintenance
@@ -55,7 +58,7 @@ def main():
     search.add_argument("--offset", type=int, default=0)
     search.add_argument("--no-semantic", action="store_true")
     search.add_argument("--min-score", type=float, default=0.16)
-    search.add_argument("--sort", choices=["relevance", "collection_asc", "collection_desc"], default="relevance")
+    search.add_argument("--sort", choices=["relevance", "collection_asc", "collection_desc"], default="collection_asc")
     tags = commands.add_parser("tags")
     tags.add_argument("--query", default="")
     update = commands.add_parser("update")
@@ -103,7 +106,44 @@ def main():
     restore.add_argument("archive")
     restore.add_argument("target_dir")
 
+    init_cmd = commands.add_parser("init", help="首次设置：接入你的 Agent、配置收藏夹")
+    init_cmd.add_argument("--agent", choices=AGENT_IDS)
+    init_cmd.add_argument("--driver", choices=["auto", "ego-browser", "kimicu", "handoff"])
+    init_cmd.add_argument("--xhs", action="append", help="小红书收藏专辑链接，可重复")
+    init_cmd.add_argument("--xhs-name", action="append", help="与 --xhs 一一对应的名字")
+    init_cmd.add_argument("--douyin", action="append", help="抖音收藏夹名称，可重复")
+    init_cmd.add_argument("--douyin-account", help="抖音昵称，用于核对账号")
+    init_cmd.add_argument("--config", help="sync_sources.json 位置，默认在仓库根目录")
+    init_cmd.add_argument("--sync", action="store_true", help="配置完立即同步一次")
+    init_cmd.add_argument("--yes", action="store_true", help="不逐项确认（供 Agent 调用）")
+    doctor_cmd = commands.add_parser("doctor", help="检查环境：数据、收藏夹、可用的同步方式和 Agent")
+    doctor_cmd.add_argument("--config")
+    sync_cmd = commands.add_parser("sync", help="只读增量同步收藏夹")
+    sync_cmd.add_argument("--only", action="append")
+    sync_cmd.add_argument("--driver", choices=["auto", "ego-browser", "kimicu", "handoff"])
+    sync_cmd.add_argument("--config")
+    sync_cmd.add_argument("--submit", metavar="KEY", help="导入 Agent 读取的结果")
+    sync_cmd.add_argument("--records", metavar="PATH")
+
     args = parser.parse_args()
+    if args.data_dir:
+        os.environ["INSPIRATION_DATA_DIR"] = str(Path(args.data_dir).expanduser().resolve())
+    if args.command == "init":
+        emit(run_init(args, args.data_dir))
+        return
+    if args.command == "doctor":
+        emit(doctor(args.data_dir, args.config))
+        return
+    if args.command == "sync":
+        import sync_collections
+        if args.submit:
+            if not args.records:
+                raise ValueError("--submit 需要 --records 文件")
+            records = json.loads(Path(args.records).read_text(encoding="utf-8"))
+            emit(sync_collections.submit(args.submit, records, args.config))
+        else:
+            emit(sync_collections.run(args.only, args.config, args.driver))
+        return
     library = Library(args.data_dir)
     catalog = Catalog(library)
     agent = AgentTools(catalog)

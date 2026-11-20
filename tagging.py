@@ -364,7 +364,7 @@ class Catalog:
             return {}
 
     def search(self, q="", tags=None, match="all", exclude=None, platform="", collection="",
-               limit=20, offset=0, semantic=True, min_score=0.16, sort="relevance"):
+               limit=20, offset=0, semantic=True, min_score=0.16, sort="collection_asc"):
         if sort not in {"relevance", "collection_asc", "collection_desc"}:
             raise ValueError("不支持的排序方式")
         candidates = self.structured_ids(tags, match, exclude, platform, collection)
