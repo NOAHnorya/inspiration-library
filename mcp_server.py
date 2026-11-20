@@ -105,6 +105,14 @@ TOOLS = [
 ]
 
 
+READ_ONLY = {"find_inspiration", "get_inspiration", "compare_inspiration", "create_reference_brief",
+             "validate_references", "similar_inspiration", "list_tags", "library_status", "get_sync_tasks"}
+for _tool in TOOLS:
+    _read_only = _tool["name"] in READ_ONLY
+    _tool["annotations"] = {"readOnlyHint": _read_only, "destructiveHint": False, "idempotentHint": _read_only,
+                            "openWorldHint": _tool["name"] in {"sync_collections", "import_url"}}
+
+
 class InspirationServer:
     def __init__(self, data_dir=None, config_path=None):
         self.library = Library(data_dir)

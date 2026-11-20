@@ -85,6 +85,8 @@ class Change:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_name(self.path.name + ".inspiration.tmp")
         temporary.write_text(self.content, encoding="utf-8")
+        if self.path.exists():
+            shutil.copymode(self.path, temporary)  # keep private configs private (often 600)
         temporary.replace(self.path)
         return {"written": str(self.path), "backup": str(backup) if backup else None}
 
@@ -129,8 +131,9 @@ def dsh_change(server, profile="desktop"):
     path = HOME / ".dsh" / "profiles" / profile / "cordis.patch.yml"
     text = path.read_text(encoding="utf-8") if path.exists() else ""
     args = ", ".join(json.dumps(arg, ensure_ascii=False) for arg in server["args"])
-    block = (f"{DSH_MARK_START}\n"
-             "- insert:\n"
+    # A running DSH may re-save this file and drop standalone comments, so the
+    # block is found by its structure (insert + mcp-inspiration), not markers.
+    block = ("- insert: # inspiration-library (managed by cli.py init)\n"
              "    - id: mcp-inspiration\n"
              "      name: '@deepseek-ai/dsh-mcp-client'\n"
              "      config:\n"
@@ -140,7 +143,8 @@ def dsh_change(server, profile="desktop"):
              f"        args: [{args}]\n"
              "        toolCallTimeoutMs: 120000\n"
              f"{DSH_MARK_END}\n")
-    pattern = re.compile(re.escape(DSH_MARK_START) + r".*?" + re.escape(DSH_MARK_END) + r"\n?", re.S)
+    pattern = re.compile(r"^(?:" + re.escape(DSH_MARK_START) + r"[^\n]*\n)?- insert:[^\n]*\n {4}- id: mcp-inspiration\n"
+                         r"(?: {4,}[^\n]*\n?)*(?:" + re.escape(DSH_MARK_END) + r"\n?)?", re.M)
     if pattern.search(text):
         text = pattern.sub(block, text, count=1)
     else:
