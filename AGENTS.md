@@ -45,3 +45,12 @@
 - 遇到登录、验证码、滑块、“操作过于频繁”，立即停止，请用户本人在浏览器里处理，不要尝试绕过。
 - `data/`、`backups/`、`sync_sources.json`、收藏 JSON 是用户的私人数据，不要提交到 Git 或发到网上。
 - 服务只绑定 `127.0.0.1`，不要改成对外开放。
+
+## 修改本仓库代码时：提交与合并
+
+1. 在新分支上改，不直接提交到 `main`。
+2. 开 PR 前后，都必须由**另一个 Agent**（不是写这批代码的那个）检查冲突：
+   - 先 `git fetch origin`，再确认分支能干净合并进最新的 `origin/main`，例如 `git merge-tree --write-tree origin/main HEAD` 没有冲突文件。
+   - 确认改动里没有私人数据：`data/`、`backups/`、`private/`、`sync_sources.json`、收藏 JSON、`.mcp.json`、`*.bak-inspiration-*`。
+   - 把检查结论（检查的 Agent、对比的 `origin/main` 提交、是否有冲突）写进 PR 评论。
+3. 只有检查结论是“无冲突”且 CI 通过，才可以 merge。有冲突时先在分支上解决，再请另一个 Agent 重新检查。
